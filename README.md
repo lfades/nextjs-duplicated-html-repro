@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Duplicated HTML Reproduction
 
-## Getting Started
+This app reproduces a Vercel-only duplicated HTML response issue with Next.js Cache Components.
 
-First, run the development server:
+The response for generated dynamic App Router routes can contain two full HTML documents:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+<!DOCTYPE html><html>...
+... progressiveChunkSize / resumableState ...
+<!DOCTYPE html><html>...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Issue details
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This repro keeps the minimal conditions that reproduced the issue:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `cacheComponents: true`
+- A dynamic route with `generateStaticParams()`
+- At least one generated path calls `notFound()` during prerendering (`/faq` in this repro)
+- The same route tree includes a `<Suspense>` boundary around a dynamic function (`connection()` here)
 
-## Learn More
+That build output looks like:
 
-To learn more about Next.js, take a look at the following resources:
+```text
+ƒ /[slug]
+└   /[slug]
+  ├ ◐ /homepage
+  ├ ◐ /deals
+  └ ◐ [+more paths]
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Duplicated HTML appears when a generated dynamic route has a prerender-time `notFound()` path and the route tree also contains postponed dynamic work. The original app hit this with `cookies()` inside a Suspense boundary; this minimized repro uses `connection()`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The local build also prints this vague Server Components render error while generating static pages:
 
-## Deploy on Vercel
+```text
+[Error: An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details.] {
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+That log is quite vague and looks more like an internal in Next.js rather than an user error, but disappears if the generated `/faq` route no longer calls `notFound()` during prerendering, and the deployed site stops returning duplicated HTML.
