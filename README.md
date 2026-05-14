@@ -39,4 +39,4 @@ The local build also prints this vague Server Components render error while gene
 }
 ```
 
-That log is quite vague and looks more like an internal in Next.js rather than an user error, but disappears if the generated `/faq` route no longer calls `notFound()` during prerendering, and the deployed site stops returning duplicated HTML.
+That log looks more like an internal error in Next.js rather than an user error, but disappears if the generated `/faq` route no longer calls `notFound()` during prerendering, and the deployed site stops returning duplicated HTML. However it's a bug because on Vercel all the pages are broken, there's no useful feedback from the Next.js build on what's going on, that log does not appear during development, and it works perfectly fine there and in a local production build.
